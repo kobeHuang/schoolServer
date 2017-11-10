@@ -10,7 +10,159 @@ var helper = new dbHelper.helper();
 //信息管理
 
 /*
- *  内容列表
+ *  资讯分类列表
+ *  参数：body/query:
+ 					pageno----页码
+ 					pagesize----每页条数（默认20）
+ 					search----搜索（名称）    
+ *		  headers:
+ 					userToken:  用户token
+ */
+router.all('/info_classify/list',middlewares.checkToken,function(req, res, next){
+	var params = utils.reqParams(req),
+	headers = req.headers;
+	var total = 0,
+	pageno = 1,
+	pagesize = 20,
+	search = '',
+	isAll = false;
+
+	if(params.search){
+		search = params.search;
+	}
+
+	if(!utils.sqlCheck(search)){
+		res.json(utils.resJSON(400,'参数错误'));
+	return false;
+	}
+
+	if(params.pageno){
+		pageno = params.pageno;
+	}
+
+	if(params.pagesize){
+		pagesize = params.pagesize;
+	}
+
+	if(params.isAll !== undefined){
+		isAll = params.isAll;
+	}
+
+	var _start = (pageno-1) * pagesize,
+	sql1 = "SELECT * FROM info_type",
+	sql2 = ";SELECT count(*) as total FROM info_type";
+
+	if(!utils.isEmpty(search)){
+		sql1 += " WHERE title like '%"+ search +"%'";
+		sql2 += " WHERE title like '%"+ search +"%'";
+	}
+
+	if(!isAll){
+		sql1 += " limit "+ pagesize +" offset "+_start;
+	}
+	
+	helper.query(res, sql1 + sql2, function(results){
+		var _data = {};
+		total = results[1][0].total;
+		_data.items = results[0];
+		_data.total = total;
+		_data.pageno = pageno;
+		_data.pagesize = pagesize;
+		res.json(utils.resJSON(200,_data));
+	});
+});
+
+/*
+ *  资讯分类审核
+ *  参数：body/query:
+ 					status----0/1
+ 					id----分类ID   
+ *		  headers:
+ 					userToken:  用户token
+ */
+router.all('/info_classify/status',middlewares.checkToken,function(req, res, next){
+	var params = utils.reqParams(req),
+ 		headers = req.headers;
+ 	if(params.status === undefined || !params.id){
+ 		res.json(utils.resJSON(400,'参数错误'));
+		return false;
+ 	}
+ 	helper.update(res, "UPDATE info_type SET status="+ params.status +" WHERE id="+ params.id, function(result){
+ 		var affectedRows = result.affectedRows;
+ 		if(affectedRows > 0){
+			res.json(utils.resJSON(200,{status: params.status}));
+ 		}else{
+ 			res.json(utils.resJSON(201,'分类id不存在'));
+ 		}
+ 	});
+});
+
+/*
+ *  添加分类
+ *  参数：body/query:
+ 					body   
+ *		  headers:
+ 					userToken:  用户token
+ */
+router.all('/info_classify/add',middlewares.checkToken,function(req, res, next){
+	var params = utils.reqParams(req),
+ 		headers = req.headers;
+
+ 	for(var key in params){
+ 		if(params[key] && typeof params[key] == 'string'){
+ 			if(!utils.sqlCheck(params[key])){
+	 			res.json(utils.resJSON(400,'参数错误'));
+	 			return false;
+	 		}
+ 		}	
+ 	}
+
+ 	helper.query(res,"SELECT * FROM info_type WHERE name='"+params.title+"'",function(rows){
+ 		if(rows.length > 0){
+			res.json(utils.resJSON(201,'该分类已经存在'));
+ 		}else{
+ 			helper.insert(res, "INSERT info_type (name,create_time,status) VALUES('"+params.name+"','"+new Date().toLocaleString()+"',1)", function(result){
+		 		if(result.affectedRows > 0){
+					res.json(utils.resJSON(200,{}));
+		 		}
+		 	});
+ 		}
+ 	}); 	
+});
+
+ /*
+ *  删除分类
+ *  参数：body/query:
+ 					id----搜索（ID）    
+ *		  headers:
+ 					userToken:  用户token
+ */
+router.all('/info_classify/del',middlewares.checkToken,function(req, res, next){
+	var params = utils.reqParams(req),
+ 		headers = req.headers;
+
+	if(!params.id){
+ 		res.json(utils.resJSON(400,'参数错误'));
+		return false;
+ 	}
+
+
+ 	helper.delete(res, "DELETE FROM info_type WHERE id in (" + (params.id).toString() + ")", function(result){
+ 		var affectedRows = result.affectedRows;
+ 		if(affectedRows > 0){
+			res.json(utils.resJSON(200,{}));
+ 		}
+ 	});
+
+});
+
+
+
+
+
+
+/*
+ *  资讯列表
  *  参数：body/query:
  					pageno----页码
  					pagesize----每页条数（默认20）
@@ -24,10 +176,15 @@ var helper = new dbHelper.helper();
  	var total = 0,
 		pageno = 1,
 		pagesize = 20,
-		search = '';
+		search = '',
+		type = 0;
 
 	if(params.search){
 		search = params.search;
+	}
+
+	if(params.type){
+		type = params.type;
 	}
 
  	if(!utils.sqlCheck(search)){
@@ -42,6 +199,7 @@ var helper = new dbHelper.helper();
 	if(params.pagesize){
 		pagesize = params.pagesize;
 	}
+	
 
 	var _start = (pageno-1) * pagesize,
 		sql1 = "SELECT * FROM content",
@@ -50,6 +208,15 @@ var helper = new dbHelper.helper();
 	if(!utils.isEmpty(search)){
 		sql1 += " WHERE title like '%"+ search +"%'";
 		sql2 += " WHERE title like '%"+ search +"%'";
+	}
+	if(type != 0){
+		if(!utils.isEmpty(search)){
+			sql1 += " AND type=" + type;
+			sql2 += " AND type=" + type;
+		}else{
+			sql1 += " WHERE type=" + type;
+			sql2 += " WHERE type=" + type;
+		}
 	}
 	sql1 += " limit "+ pagesize +" offset "+_start;
 	helper.query(res, sql1 + sql2, function(results){
@@ -65,7 +232,7 @@ var helper = new dbHelper.helper();
 
 
 /*
- *  内容详情
+ *  资讯详情
  *  参数：body/query:
  					id----搜索（ID）    
  *		  headers:
@@ -166,7 +333,7 @@ router.all('/content/add',middlewares.checkToken,function(req, res, next){
  		if(rows.length > 0){
 			res.json(utils.resJSON(201,'该标题已经存在'));
  		}else{
- 			helper.insert(res, "INSERT content (title,content,create_time,status) VALUES('"+params.title+"','"+params.content+"','"+new Date().toLocaleString()+"',1)", function(result){
+ 			helper.insert(res, "INSERT content (type,title,content,create_time,status) VALUES("+params.type+",'"+params.title+"','"+params.content+"','"+new Date().toLocaleString()+"',"+params.status+")", function(result){
 		 		if(result.affectedRows > 0){
 					res.json(utils.resJSON(200,{}));
 		 		}

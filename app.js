@@ -16,7 +16,9 @@ var subjects = require('./routes/admin/subject');
 var information = require('./routes/admin/information');
 var task = require('./routes/admin/task');
 var share = require('./routes/admin/share');
+var images = require('./routes/admin/images');
 var uploadImg = require('./routes/upload');
+
 
 var app = express();
 
@@ -54,7 +56,7 @@ app.use(bodyParser.urlencoded({
 
 app.use('/', routes);
 app.use('/upload', [uploadImg]);
-app.use('/admin', [login,users,grade,classes,subjects,information,share,task]);
+app.use('/admin', [login,users,grade,classes,subjects,information,share,task,images]);
 
 
 
